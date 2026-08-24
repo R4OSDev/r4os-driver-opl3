@@ -6,8 +6,8 @@ OPL3-SynthEngine-Treiber fuer R4OS.
 Ziel:
 - gueltige OPL3.R4D-Datei erzeugen
 - Treibertyp synth verwenden
-- aus Zig ueber Code/System/SDK/r4os und Code/build.zig bauen
-- seit 0.45.20 DriverApi-v12 `register_synth_engine_v2` ueber den
+- aus Zig ueber das gemappte R4OS-SDK bauen
+- `register_synth_engine_v2` ueber den
   SDK-Wrapper `registerSynthEngineEx` aufrufen
 - den externen OPL3-SynthEngine-Descriptor im Audio-Core aktivieren
 
@@ -29,28 +29,24 @@ Seit 0.45.22:
   SynthEngine-Registry und Status; OPL3-Reset, Registerwrites, MIDI-Events,
   Render und Stop laufen ueber `OPL3.R4D`.
 
-Build:
+Seit 0.69.28:
+- `render_pcm` schreibt den angeforderten Block direkt in einen vom Kernel
+  bereitgestellten Puffer. Rate, Kanalzahl, Format und Kapazitaet werden bei
+  jedem Aufruf geprueft.
+- Der Kernel reicht den Block an das aktive AudioBackend weiter und bewahrt
+  ihn bei `Busy` fuer denselben Retry auf. Der Treiber verwirft keine
+  gerenderten Stackbloecke mehr.
+- Ein Renderaufruf kann 1 bis 1024 Frames erzeugen; dadurch bleiben MIDI-
+  Tempo und PCM-Zeitbasis gekoppelt.
 
-    cd Code
-    ..\DevTools\Zig\zig.exe build
+Build unter Linux beziehungsweise Windows:
 
-Ausgabe:
-
-    Code/zig-out/OPL3.R4D
-
-Projektstruktur seit 0.51.22
---------------------------------
-
-Dieses Verzeichnis ist ein eigenstaendiges R4OS-SDK-Projekt fuer OPL3.R4D.
-
-Build:
-
-    cd Code\System\Driver\OPL3
-    ..\..\..\DevTools\Zig\zig.exe build
+    ./Build.sh
+    Build.bat
 
 Artefakt:
 
-    zig-out\OPL3.R4D
+    Artifacts/Modules/OPL3/OPL3.R4D
 
 Manifest:
 

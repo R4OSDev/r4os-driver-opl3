@@ -10,7 +10,7 @@ const OPERATOR_COUNT: usize = 36;
 const CHANNEL_COUNT: usize = 18;
 pub const RENDER_FRAMES: usize = 1024;
 pub const RENDER_BYTES: usize = RENDER_FRAMES * 4;
-const SAMPLE_RATE: u32 = 48_000;
+pub const SAMPLE_RATE: u32 = 48_000;
 const MIDI_CHANNEL_COUNT: usize = 16;
 const NOTE_RELEASE_FRAMES: u16 = 4_800;
 
@@ -181,10 +181,14 @@ pub fn runRegisterDemo() void {
 }
 
 pub fn renderBlock(out: []u8) bool {
-    if (out.len < RENDER_BYTES) return false;
+    return renderFrames(out, RENDER_FRAMES);
+}
+
+pub fn renderFrames(out: []u8, frame_count: usize) bool {
+    if (frame_count == 0 or frame_count > RENDER_FRAMES or out.len < frame_count * 4) return false;
 
     var frame: usize = 0;
-    while (frame < RENDER_FRAMES) : (frame += 1) {
+    while (frame < frame_count) : (frame += 1) {
         var left: i32 = 0;
         var right: i32 = 0;
         var mixed_channels: u8 = 0;
@@ -227,7 +231,7 @@ pub fn renderBlock(out: []u8) bool {
 
     if (last_mixed_channels == 0) return false;
     render_blocks += 1;
-    render_frames += RENDER_FRAMES;
+    render_frames += frame_count;
     return true;
 }
 

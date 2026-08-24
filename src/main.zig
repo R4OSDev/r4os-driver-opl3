@@ -20,7 +20,7 @@ export fn opl3_init(api: *const r4os.r4dev.DriverApi) callconv(.c) i32 {
     engine = .{
         .flags = r4os.abi.synth_engine_flag_midi | r4os.abi.synth_engine_flag_opl3,
         .midi_send = opl3MidiSend,
-        .render = opl3Render,
+        .render_pcm = opl3RenderPcm,
         .stop = opl3Stop,
         .status = opl3Status,
         .opl3_reset = opl3Reset,
@@ -55,13 +55,15 @@ fn opl3MidiSend(context: ?*anyopaque, channel: u8, status: u8, data1: u8, data2:
     return 0;
 }
 
-fn opl3Render(context: ?*anyopaque) callconv(.c) i32 {
+fn opl3RenderPcm(context: ?*anyopaque, out: [*]u8, capacity: u32, rate: u32, channels: u16, format: u16) callconv(.c) i32 {
     _ = context;
-    var block: [opl3.RENDER_BYTES]u8 = undefined;
-    _ = opl3.renderBlock(block[0..]);
+    if (rate != opl3.SAMPLE_RATE or channels != 2 or format != @intFromEnum(r4os.abi.AudioFormat.s16le)) return r4os.abi.service_api_result_invalid;
+    if (capacity == 0 or capacity > opl3.RENDER_BYTES or (capacity % 4) != 0) return r4os.abi.service_api_result_invalid;
+    const frames: usize = capacity / 4;
+    _ = opl3.renderFrames(out[0..capacity], frames);
     engine_renders +%= 1;
     engine_last_result = 0;
-    return 0;
+    return @intCast(capacity);
 }
 
 fn opl3Stop(context: ?*anyopaque) callconv(.c) i32 {
