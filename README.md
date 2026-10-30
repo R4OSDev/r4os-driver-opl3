@@ -4,13 +4,19 @@
 
 ## Package
 
-- Version: `0.1.1`
+- Version: `0.1.3`
 - Image target: `/R4OS/DRIVERS/OPL3.R4D`
 - Image scope: `full`
 - Canonical project manifest: `module.R4MF`
 
 The manifest is the single source of truth for the artifact, imports, image
 target, and package metadata.
+
+Version0.1.3 removes unused internal text dumps and their private bookkeeping.
+The actual renderer, last mixed-channel result, register/MIDI/voice allocation,
+release envelopes, rhythm/noise state and public SynthEngineStatus counters
+keep their original contracts. Source and compiled-footprint evidence belongs
+to the workspace Audio/SIDStand.txt review for0.88.54.
 
 ## Build
 

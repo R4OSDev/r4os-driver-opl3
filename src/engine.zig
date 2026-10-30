@@ -1,10 +1,3 @@
-const k = struct {
-    fn puts(_: []const u8) void {}
-    fn putDec(_: anytype) void {}
-    fn putHex(_: anytype, _: u8) void {}
-    fn putc(_: u8) void {}
-};
-
 const REGISTER_COUNT: usize = 512;
 const OPERATOR_COUNT: usize = 36;
 const CHANNEL_COUNT: usize = 18;
@@ -92,55 +85,27 @@ const Patch = struct {
 var registers: [REGISTER_COUNT]u8 = .{0} ** REGISTER_COUNT;
 var operators: [OPERATOR_COUNT]Operator = .{Operator{}} ** OPERATOR_COUNT;
 var channels: [CHANNEL_COUNT]Channel = .{Channel{}} ** CHANNEL_COUNT;
-var writes: u64 = 0;
-var last_bank: u8 = 0;
-var last_register: u8 = 0;
-var last_value: u8 = 0;
 var opl3_enabled: bool = false;
 var rhythm_enabled: bool = false;
 var rhythm_bits: u8 = 0;
 var four_op_mask: u8 = 0;
 var noise_state: u32 = 0x1234_ABCD;
 var waveform_select_enabled: bool = false;
-var render_blocks: u64 = 0;
-var render_frames: u64 = 0;
-var last_render_channel: u8 = 0;
-var last_render_sample: i16 = 0;
-var last_left_sample: i16 = 0;
-var last_right_sample: i16 = 0;
 var last_mixed_channels: u8 = 0;
-var midi_note_events: u64 = 0;
-var voice_steals: u64 = 0;
 var midi_channels: [MIDI_CHANNEL_COUNT]MidiChannelState = .{MidiChannelState{}} ** MIDI_CHANNEL_COUNT;
-var midi_program_changes: u64 = 0;
-var midi_control_changes: u64 = 0;
 
 pub fn reset() void {
     registers = .{0} ** REGISTER_COUNT;
     operators = .{Operator{}} ** OPERATOR_COUNT;
     channels = .{Channel{}} ** CHANNEL_COUNT;
-    writes = 0;
-    last_bank = 0;
-    last_register = 0;
-    last_value = 0;
     opl3_enabled = false;
     rhythm_enabled = false;
     rhythm_bits = 0;
     four_op_mask = 0;
     noise_state = 0x1234_ABCD;
     waveform_select_enabled = false;
-    render_blocks = 0;
-    render_frames = 0;
-    last_render_channel = 0;
-    last_render_sample = 0;
-    last_left_sample = 0;
-    last_right_sample = 0;
     last_mixed_channels = 0;
-    midi_note_events = 0;
-    voice_steals = 0;
     midi_channels = .{MidiChannelState{}} ** MIDI_CHANNEL_COUNT;
-    midi_program_changes = 0;
-    midi_control_changes = 0;
     initChannelOperators();
 }
 
@@ -148,10 +113,6 @@ pub fn writeRegister(bank: u8, reg: u8, value: u8) i32 {
     if (bank > 1) return -1;
     const index: usize = (@as(usize, bank) * 256) + reg;
     registers[index] = value;
-    writes += 1;
-    last_bank = bank;
-    last_register = reg;
-    last_value = value;
     decodeGlobal(bank, reg, value);
     decodeOperator(bank, reg, value);
     decodeChannel(bank, reg, value);
@@ -203,7 +164,6 @@ pub fn renderFrames(out: []u8, frame_count: usize) bool {
             if (pan_left) left += sample;
             if (pan_right) right += sample;
             mixed_channels += 1;
-            last_render_channel = @intCast(ch_index);
         }
 
         if (rhythm_enabled) {
@@ -223,15 +183,10 @@ pub fn renderFrames(out: []u8, frame_count: usize) bool {
         out[off + 1] = @intCast((left_bits >> 8) & 0x00FF);
         out[off + 2] = @intCast(right_bits & 0x00FF);
         out[off + 3] = @intCast((right_bits >> 8) & 0x00FF);
-        last_render_sample = left_sample;
-        last_left_sample = left_sample;
-        last_right_sample = right_sample;
         last_mixed_channels = mixed_channels;
     }
 
     if (last_mixed_channels == 0) return false;
-    render_blocks += 1;
-    render_frames += frame_count;
     return true;
 }
 
@@ -277,7 +232,6 @@ pub fn midiNoteOn(note: u8, velocity: u8, midi_channel: u8) void {
     channels[ch_index].midi_note = note;
     channels[ch_index].midi_velocity = velocity;
     channels[ch_index].midi_channel = midi_channel & 0x0F;
-    midi_note_events += 1;
 }
 
 pub fn midiNoteOff(note: u8, midi_channel: u8) void {
@@ -290,7 +244,6 @@ pub fn midiNoteOff(note: u8, midi_channel: u8) void {
 
 pub fn midiProgramChange(midi_channel: u8, program: u8) void {
     midi_channels[midi_channel & 0x0F].program = program & 0x7F;
-    midi_program_changes += 1;
 }
 
 pub fn midiControlChange(midi_channel: u8, controller: u8, value: u8) void {
@@ -302,67 +255,11 @@ pub fn midiControlChange(midi_channel: u8, controller: u8, value: u8) void {
         121 => midi_channels[index] = .{ .program = midi_channels[index].program },
         else => {},
     }
-    midi_control_changes += 1;
 }
 
 pub fn allNotesOff() void {
     var i: usize = 0;
     while (i < 12) : (i += 1) keyOffChannel(i);
-}
-
-pub fn dumpStatus() void {
-    k.puts("OPL3:\r\n");
-    k.puts("  model=yes writes=");
-    k.putDec(writes);
-    k.puts(" last=");
-    k.putDec(last_bank);
-    k.putc(':');
-    k.putHex(last_register, 2);
-    k.putc('=');
-    k.putHex(last_value, 2);
-    k.puts(" opl3=");
-    k.puts(if (opl3_enabled) "yes" else "no");
-    k.puts(" wave=");
-    k.puts(if (waveform_select_enabled) "yes" else "no");
-    k.puts(" rhythm=");
-    k.puts(if (rhythm_enabled) "yes" else "no");
-    k.puts(" rhythm_bits=");
-    k.putHex(rhythm_bits, 2);
-    k.puts(" fourop=");
-    k.putHex(four_op_mask, 2);
-    k.puts(" active_ch=");
-    k.putDec(activeChannelCount());
-    k.puts(" voices=");
-    k.putDec(activeVoiceCount());
-    k.puts(" note_events=");
-    k.putDec(midi_note_events);
-    k.puts(" programs=");
-    k.putDec(midi_program_changes);
-    k.puts(" controls=");
-    k.putDec(midi_control_changes);
-    k.puts(" steals=");
-    k.putDec(voice_steals);
-    k.puts(" mixed_ch=");
-    k.putDec(last_mixed_channels);
-    k.puts(" render_blocks=");
-    k.putDec(render_blocks);
-    k.puts(" frames=");
-    k.putDec(render_frames);
-    k.puts(" last_ch=");
-    k.putDec(last_render_channel);
-    k.puts(" sample=");
-    if (last_render_sample < 0) {
-        k.putc('-');
-        k.putDec(@intCast(-last_render_sample));
-    } else {
-        k.putDec(@intCast(last_render_sample));
-    }
-    k.puts(" lr=");
-    printSigned(last_left_sample);
-    k.putc('/');
-    printSigned(last_right_sample);
-    k.puts("\r\n");
-    dumpActiveChannels();
 }
 
 fn initChannelOperators() void {
@@ -467,24 +364,6 @@ fn operatorOffsetIndex(offset: u8) ?usize {
     return null;
 }
 
-fn activeChannelCount() u32 {
-    var count: u32 = 0;
-    var i: usize = 0;
-    while (i < channels.len) : (i += 1) {
-        if (channels[i].key_on) count += 1;
-    }
-    return count;
-}
-
-fn activeVoiceCount() u32 {
-    var count: u32 = 0;
-    var i: usize = 0;
-    while (i < 12) : (i += 1) {
-        if (channels[i].key_on and channels[i].midi_note != 0xFF) count += 1;
-    }
-    return count;
-}
-
 fn renderChannelSample(ch: *Channel) i32 {
     const mod = &operators[ch.mod_operator];
     const car = &operators[ch.car_operator];
@@ -532,7 +411,6 @@ fn allocateVoice(note: u8, midi_channel: u8) usize {
     while (i < 12) : (i += 1) {
         if (!channels[i].key_on) return i;
     }
-    voice_steals += 1;
     keyOffChannel(0);
     return 0;
 }
@@ -742,15 +620,6 @@ fn clampI16(value: i32) i16 {
     return @intCast(value);
 }
 
-fn printSigned(value: i16) void {
-    if (value < 0) {
-        k.putc('-');
-        k.putDec(@intCast(-value));
-    } else {
-        k.putDec(@intCast(value));
-    }
-}
-
 fn phaseStep(op: *const Operator, ch: *const Channel) u32 {
     const multiple = if (op.multiple == 0) 1 else @as(u32, op.multiple);
     const block_shift: u5 = @intCast(ch.block);
@@ -813,54 +682,4 @@ fn sineSample(p: u16) i32 {
         2 => -sine_quarter[index],
         else => -sine_quarter[32 - index],
     };
-}
-
-fn dumpActiveChannels() void {
-    var printed: u32 = 0;
-    var i: usize = 0;
-    while (i < channels.len and printed < 4) : (i += 1) {
-        if (!channels[i].key_on and channels[i].fnum == 0 and channels[i].feedback == 0) continue;
-        const mod = &operators[channels[i].mod_operator];
-        const car = &operators[channels[i].car_operator];
-        k.puts("  ch");
-        k.putDec(i);
-        k.puts(": key=");
-        k.puts(if (channels[i].key_on) "on" else "off");
-        k.puts(" fnum=");
-        k.putDec(channels[i].fnum);
-        k.puts(" block=");
-        k.putDec(channels[i].block);
-        k.puts(" alg=");
-        k.putDec(channels[i].algorithm);
-        k.puts(" fb=");
-        k.putDec(channels[i].feedback);
-        k.puts(" pan=");
-        k.puts(if (channels[i].pan_left) "L" else "-");
-        k.puts(if (channels[i].pan_right) "R" else "-");
-        k.puts(" mod(mul=");
-        k.putDec(mod.multiple);
-        k.puts(" tl=");
-        k.putDec(mod.total_level);
-        k.puts(" ar=");
-        k.putDec(mod.attack);
-        k.puts(" dr=");
-        k.putDec(mod.decay);
-        k.puts(") car(mul=");
-        k.putDec(car.multiple);
-        k.puts(" tl=");
-        k.putDec(car.total_level);
-        k.puts(" ar=");
-        k.putDec(car.attack);
-        k.puts(" dr=");
-        k.putDec(car.decay);
-        k.puts(" wf=");
-        k.putDec(car.waveform);
-        k.puts(" env=");
-        k.putDec(car.envelope);
-        k.puts(" rate=");
-        k.putDec(SAMPLE_RATE);
-        k.puts(")\r\n");
-        printed += 1;
-    }
-    if (printed == 0) k.puts("  channels: none programmed\r\n");
 }
