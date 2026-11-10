@@ -4,7 +4,7 @@
 
 ## Package
 
-- Version: `0.1.3`
+- Version: `0.1.4`
 - Image target: `/R4OS/DRIVERS/OPL3.R4D`
 - Image scope: `full`
 - Canonical project manifest: `module.R4MF`
@@ -44,3 +44,7 @@ Detailed German technical notes from the migration are preserved in
 Original R4OS material is licensed under Apache License 2.0. See `LICENSE`
 and `NOTICE`. Any repository-specific external material is documented in
 `THIRD_PARTY_NOTICES.md`.
+
+## API migration 0.90.52
+
+The normal module uses DriverInit2/DriverApi2 with actual R4DEV Query2:2 callback admission. Synth engines retain their typed SynthEngine registration and original rendering/event/Stop behavior. Invalid or missing platform callbacks are rejected before registration. SDK 0.64.193; independent resource-record revision1 remains distinct from the platform generation. Native, host-model and Windows compilation qualification are recorded separately in the R4OS ConsumerMigration report.

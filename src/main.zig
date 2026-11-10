@@ -9,11 +9,12 @@ var engine_last_result: i32 = 0;
 var engine: r4os.abi.SynthEngine = .{};
 
 comptime {
-    asm (r4os.r4dev.driverEntriesAsm("opl3_init", "opl3_shutdown"));
+    if (!@import("builtin").is_test) asm (r4os.technical2.driverEntriesAsm("opl3_init", "opl3_shutdown"));
 }
 
-export fn opl3_init(api: *const r4os.r4dev.DriverApi) callconv(.c) i32 {
-    var ctx = r4os.r4dev.DriverContext.init(api);
+export fn opl3_init(api: *const r4os.abi.DriverApi2) callconv(.c) i32 {
+    var ctx = r4os.r4dev.DriverContext2.init(api);
+    if (!ctx.requires(.{"register_synth_engine_v2"})) return -10;
     ctx.logInfo("OPL3 synth engine init");
     opl3.reset();
     opl3.configureDefaultPatch();
